@@ -92,7 +92,6 @@ message TestNumbers {
   optional uint32 f = 6;
 }
 
-
 message TestCamelCase {
   optional string normal_field = 1;
   optional int32 CAPITAL_FIELD = 2;
@@ -127,4 +126,14 @@ message TestExtension {
     optional TestExtension ext = 100;
   }
   optional string value = 1;
+}
+
+enum EnumValue {
+  PROTOCOL = 0;
+  BUFFER = 1;
+  DEFAULT = 2;
+}
+
+message TestDefaultEnumValue {
+  optional EnumValue enum_value = 1 [default = DEFAULT];
 }

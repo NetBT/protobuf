@@ -99,7 +99,6 @@ public class ExtensionRegistry extends ExtensionRegistryLite {
     return EMPTY_REGISTRY;
   }
 
-
   /** Returns an unmodifiable view of the registry. */
   @Override
   public ExtensionRegistry getUnmodifiable() {
@@ -154,7 +153,7 @@ public class ExtensionRegistry extends ExtensionRegistryLite {
     return mutableExtensionsByName.get(fullName);
   }
 
-  /** Deprecated. Use {@link #findImmutableExtensionByNumber( Descriptors.Descriptor, int)} */
+  /** Deprecated. Use {@link #findImmutableExtensionByNumber(Descriptors.Descriptor, int)} */
   @Deprecated
   public ExtensionInfo findExtensionByNumber(
       final Descriptor containingType, final int fieldNumber) {

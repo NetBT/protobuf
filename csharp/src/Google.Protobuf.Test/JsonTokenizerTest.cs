@@ -29,6 +29,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endregion
+
 using NUnit.Framework;
 using System;
 using System.IO;
@@ -126,7 +127,7 @@ namespace Google.Protobuf
             tokenizer.PushBack(token);
             Assert.AreEqual(0, tokenizer.ObjectDepth);
             // Read the same token again, and get back to depth 1
-            token = tokenizer.Next();
+            _ = tokenizer.Next();
             Assert.AreEqual(1, tokenizer.ObjectDepth);
 
             // Now the same in reverse, with EndObject
@@ -199,12 +200,8 @@ namespace Google.Protobuf
         [TestCase("1e-")]
         [TestCase("--")]
         [TestCase("--1")]
-        // Skip these test cases in .NET 5 because floating point parsing supports bigger values.
-        // These big values won't throw an error in the test.
-#if !NET5_0
         [TestCase("-1.7977e308")]
         [TestCase("1.7977e308")]
-#endif
         public void InvalidNumberValue(string json)
         {
             AssertThrowsAfter(json);

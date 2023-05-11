@@ -44,10 +44,15 @@ module Google
         self.class.encode_json(self, options)
       end
 
-      def to_proto
-        self.class.encode(self)
+      def to_proto(options = {})
+        self.class.encode(self, options)
       end
 
     end
+    class AbstractMessage
+      include MessageExts
+      extend MessageExts::ClassMethods
+    end
+    private_constant :AbstractMessage
   end
 end

@@ -84,6 +84,34 @@ class EncodeDecodeTest < Test::Unit::TestCase
     )
 
     assert_match 'optional_int32', json
+
+
+    # Test for enums printing as ints.
+    msg = A::B::C::TestMessage.new({ optional_enum: 1 })
+    json = A::B::C::TestMessage.encode_json(
+      msg, 
+      { :format_enums_as_integers => true }
+    )
+
+    assert_match '"optionalEnum":1', json
+
+    # Test for default enum being printed as int.
+    msg = A::B::C::TestMessage.new({ optional_enum: 0 })
+    json = A::B::C::TestMessage.encode_json(
+      msg, 
+      { :format_enums_as_integers => true, :emit_defaults => true }
+    )
+
+    assert_match '"optionalEnum":0', json
+
+    # Test for repeated enums printing as ints.
+    msg = A::B::C::TestMessage.new({ repeated_enum: [0,1,2,3] })
+    json = A::B::C::TestMessage.encode_json(
+      msg, 
+      { :format_enums_as_integers => true }
+    )
+
+    assert_match '"repeatedEnum":[0,1,2,3]', json
   end
 
   def test_encode_wrong_msg
@@ -99,6 +127,57 @@ class EncodeDecodeTest < Test::Unit::TestCase
     msg = A::B::C::TestJsonName.new(:value => 42)
     json = msg.to_json
     assert_match json, "{\"CustomJsonName\":42}"
+  end
+
+  def test_decode_depth_limit
+    msg = A::B::C::TestMessage.new(
+      optional_msg: A::B::C::TestMessage.new(
+        optional_msg: A::B::C::TestMessage.new(
+          optional_msg: A::B::C::TestMessage.new(
+            optional_msg: A::B::C::TestMessage.new(
+              optional_msg: A::B::C::TestMessage.new(
+              )
+            )
+          )
+        )
+      )
+    )
+    msg_encoded = A::B::C::TestMessage.encode(msg)
+    msg_out = A::B::C::TestMessage.decode(msg_encoded)
+    assert_match msg.to_json, msg_out.to_json
+
+    assert_raise Google::Protobuf::ParseError do
+      A::B::C::TestMessage.decode(msg_encoded, { recursion_limit: 4 })
+    end
+
+    msg_out = A::B::C::TestMessage.decode(msg_encoded, { recursion_limit: 5 })
+    assert_match msg.to_json, msg_out.to_json
+  end
+
+  def test_encode_depth_limit
+    msg = A::B::C::TestMessage.new(
+      optional_msg: A::B::C::TestMessage.new(
+        optional_msg: A::B::C::TestMessage.new(
+          optional_msg: A::B::C::TestMessage.new(
+            optional_msg: A::B::C::TestMessage.new(
+              optional_msg: A::B::C::TestMessage.new(
+              )
+            )
+          )
+        )
+      )
+    )
+    msg_encoded = A::B::C::TestMessage.encode(msg)
+    msg_out = A::B::C::TestMessage.decode(msg_encoded)
+    assert_match msg.to_json, msg_out.to_json
+
+    assert_raise RuntimeError do
+      A::B::C::TestMessage.encode(msg, { recursion_limit: 5 })
+    end
+
+    msg_encoded = A::B::C::TestMessage.encode(msg, { recursion_limit: 6 })
+    msg_out = A::B::C::TestMessage.decode(msg_encoded)
+    assert_match msg.to_json, msg_out.to_json
   end
 
 end

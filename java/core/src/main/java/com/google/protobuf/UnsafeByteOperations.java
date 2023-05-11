@@ -35,7 +35,7 @@ import java.nio.ByteBuffer;
 
 /**
  * Provides a number of unsafe byte operations to be used by advanced applications with high
- * performance requirements. These methods are referred to as "unsafe" due to the fact that they
+ * performance requirements. These methods are referred to as "unsafe" because they
  * potentially expose the backing buffer of a {@link ByteString} to the application.
  *
  * <p><strong>DISCLAIMER:</strong> The methods in this class should only be called if it is
@@ -43,7 +43,7 @@ import java.nio.ByteBuffer;
  * ByteString} can lead to unexpected and undesirable consequences in your application, and will
  * likely be difficult to debug. Proceed with caution!
  *
- * <p>This can have a number of significant side affects that have spooky-action-at-a-distance-like
+ * <p>This can have a number of significant side effects that have spooky-action-at-a-distance-like
  * behavior. In particular, if the bytes value changes out from under a Protocol Buffer:
  *
  * <ul>
@@ -117,5 +117,4 @@ public final class UnsafeByteOperations {
   public static void unsafeWriteTo(ByteString bytes, ByteOutput output) throws IOException {
     bytes.writeTo(output);
   }
-
 }

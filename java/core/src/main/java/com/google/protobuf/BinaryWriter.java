@@ -65,6 +65,7 @@ import java.util.Queue;
  * The {@link #getTotalBytesWritten()} will continue to reflect the total of the write and will not
  * be reset.
  */
+@CheckReturnValue
 @ExperimentalApi
 abstract class BinaryWriter extends ByteOutput implements Writer {
   public static final int DEFAULT_CHUNK_SIZE = 4096;
@@ -162,6 +163,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
    * <p>After calling this method, the writer can not be reused. Create a new writer for future
    * writes.
    */
+  @CanIgnoreReturnValue
   public final Queue<AllocatedBuffer> complete() {
     finishCurrentBuffer();
     return buffers;
@@ -207,7 +209,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
     }
   }
 
-  private final void writeInt32List_Internal(int fieldNumber, List<Integer> list, boolean packed)
+  private void writeInt32List_Internal(int fieldNumber, List<Integer> list, boolean packed)
       throws IOException {
     if (packed) {
       requireSpace((MAX_VARINT32_SIZE * 2) + (list.size() * MAX_VARINT64_SIZE));
@@ -225,7 +227,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
     }
   }
 
-  private final void writeInt32List_Internal(int fieldNumber, IntArrayList list, boolean packed)
+  private void writeInt32List_Internal(int fieldNumber, IntArrayList list, boolean packed)
       throws IOException {
     if (packed) {
       requireSpace((MAX_VARINT32_SIZE * 2) + (list.size() * MAX_VARINT64_SIZE));
@@ -253,7 +255,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
     }
   }
 
-  private final void writeFixed32List_Internal(int fieldNumber, List<Integer> list, boolean packed)
+  private void writeFixed32List_Internal(int fieldNumber, List<Integer> list, boolean packed)
       throws IOException {
     if (packed) {
       requireSpace((MAX_VARINT32_SIZE * 2) + (list.size() * FIXED32_SIZE));
@@ -271,7 +273,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
     }
   }
 
-  private final void writeFixed32List_Internal(int fieldNumber, IntArrayList list, boolean packed)
+  private void writeFixed32List_Internal(int fieldNumber, IntArrayList list, boolean packed)
       throws IOException {
     if (packed) {
       requireSpace((MAX_VARINT32_SIZE * 2) + (list.size() * FIXED32_SIZE));
@@ -305,7 +307,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
     }
   }
 
-  private final void writeUInt64List_Internal(int fieldNumber, List<Long> list, boolean packed)
+  private void writeUInt64List_Internal(int fieldNumber, List<Long> list, boolean packed)
       throws IOException {
     if (packed) {
       requireSpace((MAX_VARINT32_SIZE * 2) + (list.size() * MAX_VARINT64_SIZE));
@@ -323,7 +325,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
     }
   }
 
-  private final void writeUInt64List_Internal(int fieldNumber, LongArrayList list, boolean packed)
+  private void writeUInt64List_Internal(int fieldNumber, LongArrayList list, boolean packed)
       throws IOException {
     if (packed) {
       requireSpace((MAX_VARINT32_SIZE * 2) + (list.size() * MAX_VARINT64_SIZE));
@@ -351,7 +353,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
     }
   }
 
-  private final void writeFixed64List_Internal(int fieldNumber, List<Long> list, boolean packed)
+  private void writeFixed64List_Internal(int fieldNumber, List<Long> list, boolean packed)
       throws IOException {
     if (packed) {
       requireSpace((MAX_VARINT32_SIZE * 2) + (list.size() * FIXED64_SIZE));
@@ -369,7 +371,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
     }
   }
 
-  private final void writeFixed64List_Internal(int fieldNumber, LongArrayList list, boolean packed)
+  private void writeFixed64List_Internal(int fieldNumber, LongArrayList list, boolean packed)
       throws IOException {
     if (packed) {
       requireSpace((MAX_VARINT32_SIZE * 2) + (list.size() * FIXED64_SIZE));
@@ -397,7 +399,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
     }
   }
 
-  private final void writeFloatList_Internal(int fieldNumber, List<Float> list, boolean packed)
+  private void writeFloatList_Internal(int fieldNumber, List<Float> list, boolean packed)
       throws IOException {
     if (packed) {
       requireSpace((MAX_VARINT32_SIZE * 2) + (list.size() * FIXED32_SIZE));
@@ -415,7 +417,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
     }
   }
 
-  private final void writeFloatList_Internal(int fieldNumber, FloatArrayList list, boolean packed)
+  private void writeFloatList_Internal(int fieldNumber, FloatArrayList list, boolean packed)
       throws IOException {
     if (packed) {
       requireSpace((MAX_VARINT32_SIZE * 2) + (list.size() * FIXED32_SIZE));
@@ -443,7 +445,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
     }
   }
 
-  private final void writeDoubleList_Internal(int fieldNumber, List<Double> list, boolean packed)
+  private void writeDoubleList_Internal(int fieldNumber, List<Double> list, boolean packed)
       throws IOException {
     if (packed) {
       requireSpace((MAX_VARINT32_SIZE * 2) + (list.size() * FIXED64_SIZE));
@@ -461,7 +463,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
     }
   }
 
-  private final void writeDoubleList_Internal(int fieldNumber, DoubleArrayList list, boolean packed)
+  private void writeDoubleList_Internal(int fieldNumber, DoubleArrayList list, boolean packed)
       throws IOException {
     if (packed) {
       requireSpace((MAX_VARINT32_SIZE * 2) + (list.size() * FIXED64_SIZE));
@@ -495,7 +497,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
     }
   }
 
-  private final void writeBoolList_Internal(int fieldNumber, List<Boolean> list, boolean packed)
+  private void writeBoolList_Internal(int fieldNumber, List<Boolean> list, boolean packed)
       throws IOException {
     if (packed) {
       requireSpace((MAX_VARINT32_SIZE * 2) + list.size());
@@ -513,7 +515,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
     }
   }
 
-  private final void writeBoolList_Internal(int fieldNumber, BooleanArrayList list, boolean packed)
+  private void writeBoolList_Internal(int fieldNumber, BooleanArrayList list, boolean packed)
       throws IOException {
     if (packed) {
       requireSpace((MAX_VARINT32_SIZE * 2) + list.size());
@@ -570,7 +572,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
     }
   }
 
-  private final void writeUInt32List_Internal(int fieldNumber, List<Integer> list, boolean packed)
+  private void writeUInt32List_Internal(int fieldNumber, List<Integer> list, boolean packed)
       throws IOException {
     if (packed) {
       requireSpace((MAX_VARINT32_SIZE * 2) + (list.size() * MAX_VARINT32_SIZE));
@@ -588,7 +590,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
     }
   }
 
-  private final void writeUInt32List_Internal(int fieldNumber, IntArrayList list, boolean packed)
+  private void writeUInt32List_Internal(int fieldNumber, IntArrayList list, boolean packed)
       throws IOException {
     if (packed) {
       requireSpace((MAX_VARINT32_SIZE * 2) + (list.size() * MAX_VARINT32_SIZE));
@@ -628,7 +630,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
     }
   }
 
-  private final void writeSInt32List_Internal(int fieldNumber, List<Integer> list, boolean packed)
+  private void writeSInt32List_Internal(int fieldNumber, List<Integer> list, boolean packed)
       throws IOException {
     if (packed) {
       requireSpace((MAX_VARINT32_SIZE * 2) + (list.size() * MAX_VARINT32_SIZE));
@@ -646,7 +648,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
     }
   }
 
-  private final void writeSInt32List_Internal(int fieldNumber, IntArrayList list, boolean packed)
+  private void writeSInt32List_Internal(int fieldNumber, IntArrayList list, boolean packed)
       throws IOException {
     if (packed) {
       requireSpace((MAX_VARINT32_SIZE * 2) + (list.size() * MAX_VARINT32_SIZE));
@@ -757,7 +759,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
     }
   }
 
-  private final void writeSInt64List_Internal(int fieldNumber, List<Long> list, boolean packed)
+  private void writeSInt64List_Internal(int fieldNumber, List<Long> list, boolean packed)
       throws IOException {
     if (packed) {
       requireSpace((MAX_VARINT32_SIZE * 2) + (list.size() * MAX_VARINT64_SIZE));
@@ -775,7 +777,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
     }
   }
 
-  private final void writeSInt64List_Internal(int fieldNumber, LongArrayList list, boolean packed)
+  private void writeSInt64List_Internal(int fieldNumber, LongArrayList list, boolean packed)
       throws IOException {
     if (packed) {
       requireSpace((MAX_VARINT32_SIZE * 2) + (list.size() * MAX_VARINT64_SIZE));
@@ -808,6 +810,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
     }
   }
 
+  @Deprecated
   @Override
   public final void writeGroupList(int fieldNumber, List<?> list) throws IOException {
     for (int i = list.size() - 1; i >= 0; i--) {
@@ -815,6 +818,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
     }
   }
 
+  @Deprecated
   @Override
   public final void writeGroupList(int fieldNumber, List<?> list, Schema schema)
       throws IOException {
@@ -1080,6 +1084,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
       writeTag(fieldNumber, WIRETYPE_LENGTH_DELIMITED);
     }
 
+    @Deprecated
     @Override
     public void writeGroup(int fieldNumber, Object value) throws IOException {
       writeTag(fieldNumber, WIRETYPE_END_GROUP);
@@ -1497,8 +1502,8 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
       this.allocatedBuffer = allocatedBuffer;
       this.buffer = allocatedBuffer.array();
       int arrayOffset = allocatedBuffer.arrayOffset();
-      this.limit = arrayOffset + allocatedBuffer.limit();
-      this.offset = arrayOffset + allocatedBuffer.position();
+      this.limit = (long) arrayOffset + allocatedBuffer.limit();
+      this.offset = (long) arrayOffset + allocatedBuffer.position();
       this.offsetMinusOne = offset - 1;
       this.limitMinusOne = limit - 1;
       this.pos = limitMinusOne;
@@ -2014,8 +2019,8 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
       buffers.addFirst(allocatedBuffer);
 
       buffer = nioBuffer;
-      buffer.limit(buffer.capacity());
-      buffer.position(0);
+      Java8Compatibility.limit(buffer, buffer.capacity());
+      Java8Compatibility.position(buffer, 0);
       // Set byte order to little endian for fast writing of fixed 32/64.
       buffer.order(ByteOrder.LITTLE_ENDIAN);
 
@@ -2041,7 +2046,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
       if (buffer != null) {
         totalDoneBytes += bytesWrittenToCurrentBuffer();
         // Update the indices on the netty buffer.
-        buffer.position(pos + 1);
+        Java8Compatibility.position(buffer, pos + 1);
         buffer = null;
         pos = 0;
         limitMinusOne = 0;
@@ -2148,6 +2153,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
       writeTag(fieldNumber, WIRETYPE_LENGTH_DELIMITED);
     }
 
+    @Deprecated
     @Override
     public void writeGroup(int fieldNumber, Object value) throws IOException {
       writeTag(fieldNumber, WIRETYPE_END_GROUP);
@@ -2162,11 +2168,13 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
       writeTag(fieldNumber, WIRETYPE_START_GROUP);
     }
 
+    @Deprecated
     @Override
     public void writeStartGroup(int fieldNumber) {
       writeTag(fieldNumber, WIRETYPE_START_GROUP);
     }
 
+    @Deprecated
     @Override
     public void writeEndGroup(int fieldNumber) {
       writeTag(fieldNumber, WIRETYPE_END_GROUP);
@@ -2467,7 +2475,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
       }
 
       pos -= length;
-      buffer.position(pos + 1);
+      Java8Compatibility.position(buffer, pos + 1);
       buffer.put(value, offset, length);
     }
 
@@ -2486,7 +2494,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
       }
 
       pos -= length;
-      buffer.position(pos + 1);
+      Java8Compatibility.position(buffer, pos + 1);
       buffer.put(value, offset, length);
     }
 
@@ -2498,7 +2506,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
       }
 
       pos -= length;
-      buffer.position(pos + 1);
+      Java8Compatibility.position(buffer, pos + 1);
       buffer.put(value);
     }
 
@@ -2518,7 +2526,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
       }
 
       pos -= length;
-      buffer.position(pos + 1);
+      Java8Compatibility.position(buffer, pos + 1);
       buffer.put(value);
     }
 
@@ -2568,8 +2576,8 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
       buffers.addFirst(allocatedBuffer);
 
       buffer = nioBuffer;
-      buffer.limit(buffer.capacity());
-      buffer.position(0);
+      Java8Compatibility.limit(buffer, buffer.capacity());
+      Java8Compatibility.position(buffer, 0);
 
       bufferOffset = UnsafeUtil.addressOffset(buffer);
       limitMinusOne = bufferOffset + (buffer.limit() - 1);
@@ -2594,7 +2602,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
       if (buffer != null) {
         totalDoneBytes += bytesWrittenToCurrentBuffer();
         // Update the indices on the netty buffer.
-        buffer.position(bufferPos() + 1);
+        Java8Compatibility.position(buffer, bufferPos() + 1);
         buffer = null;
         pos = 0;
         limitMinusOne = 0;
@@ -2719,11 +2727,13 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
       writeTag(fieldNumber, WIRETYPE_START_GROUP);
     }
 
+    @Deprecated
     @Override
     public void writeStartGroup(int fieldNumber) {
       writeTag(fieldNumber, WIRETYPE_START_GROUP);
     }
 
+    @Deprecated
     @Override
     public void writeEndGroup(int fieldNumber) {
       writeTag(fieldNumber, WIRETYPE_END_GROUP);
@@ -3006,7 +3016,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
       }
 
       pos -= length;
-      buffer.position(bufferPos() + 1);
+      Java8Compatibility.position(buffer, bufferPos() + 1);
       buffer.put(value, offset, length);
     }
 
@@ -3025,7 +3035,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
       }
 
       pos -= length;
-      buffer.position(bufferPos() + 1);
+      Java8Compatibility.position(buffer, bufferPos() + 1);
       buffer.put(value, offset, length);
     }
 
@@ -3037,7 +3047,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
       }
 
       pos -= length;
-      buffer.position(bufferPos() + 1);
+      Java8Compatibility.position(buffer, bufferPos() + 1);
       buffer.put(value);
     }
 
@@ -3057,7 +3067,7 @@ abstract class BinaryWriter extends ByteOutput implements Writer {
       }
 
       pos -= length;
-      buffer.position(bufferPos() + 1);
+      Java8Compatibility.position(buffer, bufferPos() + 1);
       buffer.put(value);
     }
 

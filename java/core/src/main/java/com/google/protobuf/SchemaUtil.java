@@ -41,12 +41,11 @@ import java.util.RandomAccess;
 
 /** Helper methods used by schemas. */
 @ExperimentalApi
+@CheckReturnValue
 final class SchemaUtil {
   private static final Class<?> GENERATED_MESSAGE_CLASS = getGeneratedMessageClass();
-  private static final UnknownFieldSchema<?, ?> PROTO2_UNKNOWN_FIELD_SET_SCHEMA =
-      getUnknownFieldSetSchema(false);
-  private static final UnknownFieldSchema<?, ?> PROTO3_UNKNOWN_FIELD_SET_SCHEMA =
-      getUnknownFieldSetSchema(true);
+  private static final UnknownFieldSchema<?, ?> UNKNOWN_FIELD_SET_FULL_SCHEMA =
+      getUnknownFieldSetSchema();
   private static final UnknownFieldSchema<?, ?> UNKNOWN_FIELD_SET_LITE_SCHEMA =
       new UnknownFieldSetLiteSchema();
 
@@ -59,22 +58,24 @@ final class SchemaUtil {
    * GeneratedMessageLite}.
    */
   public static void requireGeneratedMessage(Class<?> messageType) {
+    // TODO(b/248560713) decide if we're keeping support for Full in schema classes and handle this
+    // better.
     if (!GeneratedMessageLite.class.isAssignableFrom(messageType)
         && GENERATED_MESSAGE_CLASS != null
         && !GENERATED_MESSAGE_CLASS.isAssignableFrom(messageType)) {
       throw new IllegalArgumentException(
-          "Message classes must extend GeneratedMessage or GeneratedMessageLite");
+          "Message classes must extend GeneratedMessageV3 or GeneratedMessageLite");
     }
   }
 
   public static void writeDouble(int fieldNumber, double value, Writer writer) throws IOException {
-    if (Double.compare(value, 0.0) != 0) {
+    if (Double.doubleToRawLongBits(value) != 0) {
       writer.writeDouble(fieldNumber, value);
     }
   }
 
   public static void writeFloat(int fieldNumber, float value, Writer writer) throws IOException {
-    if (Float.compare(value, 0.0f) != 0) {
+    if (Float.floatToRawIntBits(value) != 0) {
       writer.writeFloat(fieldNumber, value);
     }
   }
@@ -782,25 +783,21 @@ final class SchemaUtil {
     return tableSpaceCost + 3 * tableTimeCost <= lookupSpaceCost + 3 * lookupTimeCost;
   }
 
-  public static UnknownFieldSchema<?, ?> proto2UnknownFieldSetSchema() {
-    return PROTO2_UNKNOWN_FIELD_SET_SCHEMA;
-  }
-
-  public static UnknownFieldSchema<?, ?> proto3UnknownFieldSetSchema() {
-    return PROTO3_UNKNOWN_FIELD_SET_SCHEMA;
+  public static UnknownFieldSchema<?, ?> unknownFieldSetFullSchema() {
+    return UNKNOWN_FIELD_SET_FULL_SCHEMA;
   }
 
   public static UnknownFieldSchema<?, ?> unknownFieldSetLiteSchema() {
     return UNKNOWN_FIELD_SET_LITE_SCHEMA;
   }
 
-  private static UnknownFieldSchema<?, ?> getUnknownFieldSetSchema(boolean proto3) {
+  private static UnknownFieldSchema<?, ?> getUnknownFieldSetSchema() {
     try {
       Class<?> clz = getUnknownFieldSetSchemaClass();
       if (clz == null) {
         return null;
       }
-      return (UnknownFieldSchema) clz.getConstructor(boolean.class).newInstance(proto3);
+      return (UnknownFieldSchema) clz.getConstructor().newInstance();
     } catch (Throwable t) {
       return null;
     }
@@ -808,6 +805,8 @@ final class SchemaUtil {
 
   private static Class<?> getGeneratedMessageClass() {
     try {
+      // TODO(b/248560713) decide if we're keeping support for Full in schema classes and handle
+      // this better.
       return Class.forName("com.google.protobuf.GeneratedMessageV3");
     } catch (Throwable e) {
       return null;
@@ -900,7 +899,9 @@ final class SchemaUtil {
   }
 
   /** Filters unrecognized enum values in a list. */
+  @CanIgnoreReturnValue
   static <UT, UB> UB filterUnknownEnumList(
+      Object containerMessage,
       int number,
       List<Integer> enumList,
       EnumLiteMap<?> enumMap,
@@ -921,7 +922,9 @@ final class SchemaUtil {
           }
           ++writePos;
         } else {
-          unknownFields = storeUnknownEnum(number, enumValue, unknownFields, unknownFieldSchema);
+          unknownFields =
+              storeUnknownEnum(
+                  containerMessage, number, enumValue, unknownFields, unknownFieldSchema);
         }
       }
       if (writePos != size) {
@@ -931,7 +934,9 @@ final class SchemaUtil {
       for (Iterator<Integer> it = enumList.iterator(); it.hasNext(); ) {
         int enumValue = it.next();
         if (enumMap.findValueByNumber(enumValue) == null) {
-          unknownFields = storeUnknownEnum(number, enumValue, unknownFields, unknownFieldSchema);
+          unknownFields =
+              storeUnknownEnum(
+                  containerMessage, number, enumValue, unknownFields, unknownFieldSchema);
           it.remove();
         }
       }
@@ -940,7 +945,9 @@ final class SchemaUtil {
   }
 
   /** Filters unrecognized enum values in a list. */
+  @CanIgnoreReturnValue
   static <UT, UB> UB filterUnknownEnumList(
+      Object containerMessage,
       int number,
       List<Integer> enumList,
       EnumVerifier enumVerifier,
@@ -961,7 +968,9 @@ final class SchemaUtil {
           }
           ++writePos;
         } else {
-          unknownFields = storeUnknownEnum(number, enumValue, unknownFields, unknownFieldSchema);
+          unknownFields =
+              storeUnknownEnum(
+                  containerMessage, number, enumValue, unknownFields, unknownFieldSchema);
         }
       }
       if (writePos != size) {
@@ -971,7 +980,9 @@ final class SchemaUtil {
       for (Iterator<Integer> it = enumList.iterator(); it.hasNext(); ) {
         int enumValue = it.next();
         if (!enumVerifier.isInRange(enumValue)) {
-          unknownFields = storeUnknownEnum(number, enumValue, unknownFields, unknownFieldSchema);
+          unknownFields =
+              storeUnknownEnum(
+                  containerMessage, number, enumValue, unknownFields, unknownFieldSchema);
           it.remove();
         }
       }
@@ -980,10 +991,15 @@ final class SchemaUtil {
   }
 
   /** Stores an unrecognized enum value as an unknown value. */
+  @CanIgnoreReturnValue
   static <UT, UB> UB storeUnknownEnum(
-      int number, int enumValue, UB unknownFields, UnknownFieldSchema<UT, UB> unknownFieldSchema) {
+      Object containerMessage,
+      int number,
+      int enumValue,
+      UB unknownFields,
+      UnknownFieldSchema<UT, UB> unknownFieldSchema) {
     if (unknownFields == null) {
-      unknownFields = unknownFieldSchema.newBuilder();
+      unknownFields = unknownFieldSchema.getBuilderFromMessage(containerMessage);
     }
     unknownFieldSchema.addVarint(unknownFields, number, enumValue);
     return unknownFields;

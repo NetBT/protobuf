@@ -35,6 +35,7 @@ import static com.google.protobuf.Internal.checkNotNull;
 /**
  * Dynamically generates a manifest-based (i.e. table-based) schema for a given protobuf message.
  */
+@CheckReturnValue
 @ExperimentalApi
 final class ManifestSchemaFactory implements SchemaFactory {
 
@@ -63,7 +64,7 @@ final class ManifestSchemaFactory implements SchemaFactory {
             messageInfo.getDefaultInstance());
       }
       return MessageSetSchema.newSchema(
-          SchemaUtil.proto2UnknownFieldSetSchema(),
+          SchemaUtil.unknownFieldSetFullSchema(),
           ExtensionSchemas.full(),
           messageInfo.getDefaultInstance());
     }
@@ -97,7 +98,7 @@ final class ManifestSchemaFactory implements SchemaFactory {
             messageInfo,
             NewInstanceSchemas.full(),
             ListFieldSchema.full(),
-            SchemaUtil.proto2UnknownFieldSetSchema(),
+            SchemaUtil.unknownFieldSetFullSchema(),
             ExtensionSchemas.full(),
             MapFieldSchemas.full())
         : MessageSchema.newSchema(
@@ -105,7 +106,7 @@ final class ManifestSchemaFactory implements SchemaFactory {
             messageInfo,
             NewInstanceSchemas.full(),
             ListFieldSchema.full(),
-            SchemaUtil.proto3UnknownFieldSetSchema(),
+            SchemaUtil.unknownFieldSetFullSchema(),
             /* extensionSchema= */ null,
             MapFieldSchemas.full());
   }

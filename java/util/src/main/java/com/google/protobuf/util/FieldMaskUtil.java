@@ -46,6 +46,7 @@ import com.google.protobuf.Message;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import javax.annotation.Nullable;
 
 /**
  * Utility helper functions to work with {@link com.google.protobuf.FieldMask}.
@@ -100,9 +101,8 @@ public final class FieldMaskUtil {
   /**
    * Constructs a FieldMask for a list of field paths in a certain type.
    *
-   * @throws IllegalArgumentException if any of the field path is not valid.
+   * @throws IllegalArgumentException if any of the field path is not valid
    */
-  // TODO(xiaofeng): Consider renaming fromStrings()
   public static FieldMask fromStringList(Class<? extends Message> type, Iterable<String> paths) {
     return fromStringList(Internal.getDefaultInstance(type).getDescriptorForType(), paths);
   }
@@ -230,10 +230,8 @@ public final class FieldMaskUtil {
     return isValid(descriptor, path);
   }
 
-  /**
-   * Checks whether paths in a given fields mask are valid.
-   */
-  public static boolean isValid(Descriptor descriptor, String path) {
+  /** Checks whether paths in a given fields mask are valid. */
+  public static boolean isValid(@Nullable Descriptor descriptor, String path) {
     String[] parts = path.split(FIELD_SEPARATOR_REGEX);
     if (parts.length == 0) {
       return false;
@@ -397,5 +395,15 @@ public final class FieldMaskUtil {
    */
   public static void merge(FieldMask mask, Message source, Message.Builder destination) {
     merge(mask, source, destination, new MergeOptions());
+  }
+
+  /**
+   * Returns the result of keeping only the masked fields of the given proto.
+   */
+  @SuppressWarnings("unchecked")
+  public static <P extends Message> P trim(FieldMask mask, P source) {
+   Message.Builder destination = source.newBuilderForType();
+    merge(mask, source, destination);
+    return (P) destination.build();
   }
 }

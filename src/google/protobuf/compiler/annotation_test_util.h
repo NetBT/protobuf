@@ -31,9 +31,11 @@
 #ifndef GOOGLE_PROTOBUF_COMPILER_ANNOTATION_TEST_UTIL_H__
 #define GOOGLE_PROTOBUF_COMPILER_ANNOTATION_TEST_UTIL_H__
 
-#include <google/protobuf/descriptor.pb.h>
-#include <google/protobuf/testing/googletest.h>
+#include "google/protobuf/descriptor.pb.h"
+#include "google/protobuf/testing/googletest.h"
 #include <gtest/gtest.h>
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 // Utilities that assist in writing tests for generator annotations.
 // See java/internal/annotation_unittest.cc for an example.
@@ -58,7 +60,7 @@ struct ExpectedOutput {
 
 // Creates a file with name `filename` and content `data` in temp test
 // directory.
-void AddFile(const std::string& filename, const std::string& data);
+void AddFile(absl::string_view filename, absl::string_view data);
 
 // Runs proto compiler. Captures proto file structure in FileDescriptorProto.
 // Files will be generated in TestTempDir() folder. Callers of this
@@ -78,7 +80,7 @@ bool RunProtoCompiler(const std::string& filename,
 bool DecodeMetadata(const std::string& path, GeneratedCodeInfo* info);
 
 // Finds all of the Annotations for a given source file and path.
-// See Location.path in http://google3/net/proto2/proto/descriptor.proto for
+// See Location.path in https://github.com/protocolbuffers/protobuf/blob/main/src/google/protobuf/descriptor.proto for
 // explanation of what path vector is.
 void FindAnnotationsOnPath(
     const GeneratedCodeInfo& info, const std::string& source_file,
@@ -88,24 +90,32 @@ void FindAnnotationsOnPath(
 // Finds the Annotation for a given source file and path (or returns null if it
 // couldn't). If there are several annotations for given path, returns the first
 // one. See Location.path in
-// http://google3/net/proto2/proto/descriptor.proto for explanation of what path
+// https://github.com/protocolbuffers/protobuf/blob/main/src/google/protobuf/descriptor.proto for explanation of what path
 // vector is.
 const GeneratedCodeInfo::Annotation* FindAnnotationOnPath(
     const GeneratedCodeInfo& info, const std::string& source_file,
     const std::vector<int>& path);
 
 // Returns true if at least one of the provided annotations covers a given
-// substring in file_content.
+// substring with the given semantic in file_content.
 bool AtLeastOneAnnotationMatchesSubstring(
     const std::string& file_content,
     const std::vector<const GeneratedCodeInfo::Annotation*>& annotations,
-    const std::string& expected_text);
+    const std::string& expected_text,
+    absl::optional<GeneratedCodeInfo::Annotation::Semantic> expected_semantic =
+        absl::nullopt);
 
 // Returns true if the provided annotation covers a given substring in
 // file_content.
 bool AnnotationMatchesSubstring(const std::string& file_content,
                                 const GeneratedCodeInfo::Annotation* annotation,
                                 const std::string& expected_text);
+
+// Returns the text spanned by the annotation if the span is valid; otherwise
+// returns nullopt.
+absl::optional<absl::string_view> GetAnnotationSubstring(
+    absl::string_view file_content,
+    const GeneratedCodeInfo::Annotation& annotation);
 
 }  // namespace annotation_test_util
 }  // namespace compiler

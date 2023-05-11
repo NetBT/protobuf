@@ -40,19 +40,25 @@
 #define GOOGLE_PROTOBUF_MESSAGE_LITE_H__
 
 #include <climits>
+#include <iosfwd>
 #include <string>
 
-#include <google/protobuf/stubs/common.h>
-#include <google/protobuf/stubs/logging.h>
-#include <google/protobuf/io/coded_stream.h>
-#include <google/protobuf/arena.h>
-#include <google/protobuf/metadata_lite.h>
-#include <google/protobuf/stubs/once.h>
-#include <google/protobuf/port.h>
-#include <google/protobuf/stubs/strutil.h>
+#include "google/protobuf/stubs/common.h"
+#include "google/protobuf/arena.h"
+#include "google/protobuf/port.h"
+#include "absl/base/call_once.h"
+#include "absl/log/absl_check.h"
+#include "absl/strings/cord.h"
+#include "absl/strings/string_view.h"
+#include "google/protobuf/explicitly_constructed.h"
+#include "google/protobuf/io/coded_stream.h"
+#include "google/protobuf/metadata_lite.h"
+#include "google/protobuf/port.h"
 
 
-#include <google/protobuf/port_def.inc>
+// clang-format off
+#include "google/protobuf/port_def.inc"
+// clang-format on
 
 #ifdef SWIG
 #error "You cannot SWIG proto headers"
@@ -80,19 +86,13 @@ namespace internal {
 
 class SwapFieldHelper;
 
-// Tag type used to invoke the constinit constructor overload of some classes.
-// Such constructors are internal implementation details of the library.
-struct ConstantInitialized {
-  explicit ConstantInitialized() = default;
-};
-
 // See parse_context.h for explanation
 class ParseContext;
 
 class ExtensionSet;
 class LazyField;
 class RepeatedPtrFieldBase;
-class TcParserBase;
+class TcParser;
 class WireFormatLite;
 class WeakFieldMap;
 
@@ -103,7 +103,7 @@ class GenericTypeHandler;  // defined in repeated_field.h
 // computed size to a cached size.  Since we don't proceed with serialization
 // if the total size was > INT_MAX, it is not important what this function
 // returns for inputs > INT_MAX.  However this case should not error or
-// GOOGLE_CHECK-fail, because the full size_t resolution is still returned from
+// ABSL_CHECK-fail, because the full size_t resolution is still returned from
 // ByteSizeLong() and checked against INT_MAX; we can catch the overflow
 // there.
 inline int ToCachedSize(size_t size) { return static_cast<int>(size); }
@@ -118,54 +118,18 @@ inline size_t FromIntSize(int size) {
   return static_cast<unsigned int>(size);
 }
 
-// For cases where a legacy function returns an integer size.  We GOOGLE_DCHECK()
+// For cases where a legacy function returns an integer size.  We ABSL_DCHECK()
 // that the conversion will fit within an integer; if this is false then we
 // are losing information.
 inline int ToIntSize(size_t size) {
-  GOOGLE_DCHECK_LE(size, static_cast<size_t>(INT_MAX));
+  ABSL_DCHECK_LE(size, static_cast<size_t>(INT_MAX));
   return static_cast<int>(size);
 }
 
-// This type wraps a variable whose constructor and destructor are explicitly
-// called. It is particularly useful for a global variable, without its
-// constructor and destructor run on start and end of the program lifetime.
-// This circumvents the initial construction order fiasco, while keeping
-// the address of the empty string a compile time constant.
-//
-// Pay special attention to the initialization state of the object.
-// 1. The object is "uninitialized" to begin with.
-// 2. Call Construct() or DefaultConstruct() only if the object is
-//    uninitialized. After the call, the object becomes "initialized".
-// 3. Call get() and get_mutable() only if the object is initialized.
-// 4. Call Destruct() only if the object is initialized.
-//    After the call, the object becomes uninitialized.
-template <typename T>
-class ExplicitlyConstructed {
- public:
-  void DefaultConstruct() { new (&union_) T(); }
-
-  template <typename... Args>
-  void Construct(Args&&... args) {
-    new (&union_) T(std::forward<Args>(args)...);
-  }
-
-  void Destruct() { get_mutable()->~T(); }
-
-  constexpr const T& get() const { return reinterpret_cast<const T&>(union_); }
-  T* get_mutable() { return reinterpret_cast<T*>(&union_); }
-
- private:
-  // Prefer c++14 aligned_storage, but for compatibility this will do.
-  union AlignedUnion {
-    alignas(T) char space[sizeof(T)];
-    int64 align_to_int64;
-    void* align_to_ptr;
-  } union_;
-};
-
 // Default empty string object. Don't use this directly. Instead, call
-// GetEmptyString() to get the reference.
-PROTOBUF_EXPORT extern ExplicitlyConstructed<std::string>
+// GetEmptyString() to get the reference. This empty string is aligned with a
+// minimum alignment of 8 bytes to match the requirement of ArenaStringPtr.
+PROTOBUF_EXPORT extern ExplicitlyConstructedArenaString
     fixed_address_empty_string;
 
 
@@ -206,6 +170,8 @@ PROTOBUF_EXPORT size_t StringSpaceUsedExcludingSelfLong(const std::string& str);
 class PROTOBUF_EXPORT MessageLite {
  public:
   constexpr MessageLite() {}
+  MessageLite(const MessageLite&) = delete;
+  MessageLite& operator=(const MessageLite&) = delete;
   virtual ~MessageLite() = default;
 
   // Basic Operations ------------------------------------------------
@@ -215,33 +181,18 @@ class PROTOBUF_EXPORT MessageLite {
 
   // Construct a new instance of the same type.  Ownership is passed to the
   // caller.
-  virtual MessageLite* New() const = 0;
+  MessageLite* New() const { return New(nullptr); }
 
   // Construct a new instance on the arena. Ownership is passed to the caller
-  // if arena is a NULL. Default implementation for backwards compatibility.
-  virtual MessageLite* New(Arena* arena) const;
+  // if arena is a nullptr.
+  virtual MessageLite* New(Arena* arena) const = 0;
 
-  // Same as GetOwningArena.
-  Arena* GetArena() const { return GetOwningArena(); }
-
-  // Get a pointer that may be equal to this message's arena, or may not be.
-  // If the value returned by this method is equal to some arena pointer, then
-  // this message is on that arena; however, if this message is on some arena,
-  // this method may or may not return that arena's pointer. As a tradeoff,
-  // this method may be more efficient than GetArena(). The intent is to allow
-  // underlying representations that use e.g. tagged pointers to sometimes
-  // store the arena pointer directly, and sometimes in a more indirect way,
-  // and allow a fastpath comparison against the arena pointer when it's easy
-  // to obtain.
-  void* GetMaybeArenaPointer() const {
-    return _internal_metadata_.raw_arena_ptr();
-  }
+  Arena* GetArena() const { return _internal_metadata_.arena(); }
 
   // Clear all fields of the message and set them to their default values.
-  // Clear() avoids freeing memory, assuming that any memory allocated
-  // to hold parts of the message will be needed again to hold the next
-  // message.  If you actually want to free the memory used by a Message,
-  // you must delete it.
+  // Clear() assumes that any memory allocated to hold parts of the message
+  // will likely be needed again, so the memory used may not be freed.
+  // To ensure that all memory used by a Message is freed, you must delete it.
   virtual void Clear() = 0;
 
   // Quickly check if all required fields have values set.
@@ -270,6 +221,13 @@ class PROTOBUF_EXPORT MessageLite {
   // MessageLite::DebugString is already Utf8 Safe. This is to add compatibility
   // with Message.
   std::string Utf8DebugString() const { return DebugString(); }
+
+  // Implementation of the `AbslStringify` interface. This adds `DebugString()`
+  // to the sink. Do not rely on exact format.
+  template <typename Sink>
+  friend void AbslStringify(Sink& sink, const google::protobuf::MessageLite& msg) {
+    sink.Append(msg.DebugString());
+  }
 
   // Parsing ---------------------------------------------------------
   // Methods for parsing in protocol buffer format.  Most of these are
@@ -329,11 +287,11 @@ class PROTOBUF_EXPORT MessageLite {
   // format, matching the encoding output by MessageLite::SerializeToString().
   // If you'd like to convert a human-readable string into a protocol buffer
   // object, see google::protobuf::TextFormat::ParseFromString().
-  PROTOBUF_ATTRIBUTE_REINITIALIZES bool ParseFromString(ConstStringParam data);
+  PROTOBUF_ATTRIBUTE_REINITIALIZES bool ParseFromString(absl::string_view data);
   // Like ParseFromString(), but accepts messages that are missing
   // required fields.
   PROTOBUF_ATTRIBUTE_REINITIALIZES bool ParsePartialFromString(
-      ConstStringParam data);
+      absl::string_view data);
   // Parse a protocol buffer contained in an array of bytes.
   PROTOBUF_ATTRIBUTE_REINITIALIZES bool ParseFromArray(const void* data,
                                                        int size);
@@ -364,7 +322,7 @@ class PROTOBUF_EXPORT MessageLite {
   bool MergePartialFromCodedStream(io::CodedInputStream* input);
 
   // Merge a protocol buffer contained in a string.
-  bool MergeFromString(ConstStringParam data);
+  bool MergeFromString(absl::string_view data);
 
 
   // Serialization ---------------------------------------------------
@@ -373,7 +331,7 @@ class PROTOBUF_EXPORT MessageLite {
 
   // Write a protocol buffer of this message to the given output.  Returns
   // false on a write error.  If the message is missing required fields,
-  // this may GOOGLE_CHECK-fail.
+  // this may ABSL_CHECK-fail.
   bool SerializeToCodedStream(io::CodedOutputStream* output) const;
   // Like SerializeToCodedStream(), but allows missing required fields.
   bool SerializePartialToCodedStream(io::CodedOutputStream* output) const;
@@ -420,6 +378,36 @@ class PROTOBUF_EXPORT MessageLite {
   // Like AppendToString(), but allows missing required fields.
   bool AppendPartialToString(std::string* output) const;
 
+  // Reads a protocol buffer from a Cord and merges it into this message.
+  bool MergeFromCord(const absl::Cord& cord);
+  // Like MergeFromCord(), but accepts messages that are missing
+  // required fields.
+  bool MergePartialFromCord(const absl::Cord& cord);
+  // Parse a protocol buffer contained in a Cord.
+  PROTOBUF_ATTRIBUTE_REINITIALIZES bool ParseFromCord(const absl::Cord& cord);
+  // Like ParseFromCord(), but accepts messages that are missing
+  // required fields.
+  PROTOBUF_ATTRIBUTE_REINITIALIZES bool ParsePartialFromCord(
+      const absl::Cord& cord);
+
+  // Serialize the message and store it in the given Cord.  All required
+  // fields must be set.
+  bool SerializeToCord(absl::Cord* output) const;
+  // Like SerializeToCord(), but allows missing required fields.
+  bool SerializePartialToCord(absl::Cord* output) const;
+
+  // Make a Cord encoding the message. Is equivalent to calling
+  // SerializeToCord() on a Cord and using that.  Returns an empty
+  // Cord if SerializeToCord() would have returned an error.
+  absl::Cord SerializeAsCord() const;
+  // Like SerializeAsCord(), but allows missing required fields.
+  absl::Cord SerializePartialAsCord() const;
+
+  // Like SerializeToCord(), but appends to the data to the Cord's existing
+  // contents.  All required fields must be set.
+  bool AppendToCord(absl::Cord* output) const;
+  // Like AppendToCord(), but allows missing required fields.
+  bool AppendPartialToCord(absl::Cord* output) const;
 
   // Computes the serialized size of the message.  This recursively calls
   // ByteSizeLong() on all embedded messages.
@@ -429,8 +417,9 @@ class PROTOBUF_EXPORT MessageLite {
   virtual size_t ByteSizeLong() const = 0;
 
   // Legacy ByteSize() API.
-  PROTOBUF_DEPRECATED_MSG("Please use ByteSizeLong() instead")
-  int ByteSize() const { return internal::ToIntSize(ByteSizeLong()); }
+  [[deprecated("Please use ByteSizeLong() instead")]] int ByteSize() const {
+    return internal::ToIntSize(ByteSizeLong());
+  }
 
   // Serializes the message without recomputing the size.  The message must not
   // have changed since the last call to ByteSize(), and the value returned by
@@ -449,7 +438,7 @@ class PROTOBUF_EXPORT MessageLite {
   // must point at a byte array of at least ByteSize() bytes.  Whether to use
   // deterministic serialization, e.g., maps in sorted order, is determined by
   // CodedOutputStream::IsDefaultSerializationDeterministic().
-  uint8* SerializeWithCachedSizesToArray(uint8* target) const;
+  uint8_t* SerializeWithCachedSizesToArray(uint8_t* target) const;
 
   // Returns the result of the last call to ByteSize().  An embedded message's
   // size is needed both to serialize it (because embedded messages are
@@ -469,21 +458,22 @@ class PROTOBUF_EXPORT MessageLite {
     return nullptr;
   }
 
+  virtual void OnDemandRegisterArenaDtor(Arena* /*arena*/) {}
+
  protected:
   template <typename T>
   static T* CreateMaybeMessage(Arena* arena) {
     return Arena::CreateMaybeMessage<T>(arena);
   }
 
-  inline explicit MessageLite(Arena* arena, bool is_message_owned = false)
-      : _internal_metadata_(arena, is_message_owned) {}
+  inline explicit MessageLite(Arena* arena) : _internal_metadata_(arena) {}
 
   // Returns the arena, if any, that directly owns this message and its internal
   // memory (Arena::Own is different in that the arena doesn't directly own the
   // internal memory). This method is used in proto's implementation for
   // swapping, moving and setting allocated, for deciding whether the ownership
   // of this message or its internal memory could be changed.
-  Arena* GetOwningArena() const { return _internal_metadata_.owning_arena(); }
+  Arena* GetOwningArena() const { return _internal_metadata_.arena(); }
 
   // Returns the arena, used for allocating internal objects(e.g., child
   // messages, etc), or owning incoming objects (e.g., set allocated).
@@ -507,9 +497,9 @@ class PROTOBUF_EXPORT MessageLite {
   bool ParseFrom(const T& input);
 
   // Fast path when conditions match (ie. non-deterministic)
-  //  uint8* _InternalSerialize(uint8* ptr) const;
-  virtual uint8* _InternalSerialize(uint8* ptr,
-                                    io::EpsCopyOutputStream* stream) const = 0;
+  //  uint8_t* _InternalSerialize(uint8_t* ptr) const;
+  virtual uint8_t* _InternalSerialize(
+      uint8_t* ptr, io::EpsCopyOutputStream* stream) const = 0;
 
   // Identical to IsInitialized() except that it logs an error message.
   bool IsInitializedWithErrors() const {
@@ -519,9 +509,6 @@ class PROTOBUF_EXPORT MessageLite {
   }
 
  private:
-  // TODO(gerbens) make this a pure abstract function
-  virtual const void* InternalGetTable() const { return NULL; }
-
   friend class FastReflectionMessageMutator;
   friend class FastReflectionStringSetter;
   friend class Message;
@@ -529,7 +516,7 @@ class PROTOBUF_EXPORT MessageLite {
   friend class internal::ExtensionSet;
   friend class internal::LazyField;
   friend class internal::SwapFieldHelper;
-  friend class internal::TcParserBase;
+  friend class internal::TcParser;
   friend class internal::WeakFieldMap;
   friend class internal::WireFormatLite;
 
@@ -541,19 +528,17 @@ class PROTOBUF_EXPORT MessageLite {
   void LogInitializationErrorMessage() const;
 
   bool MergeFromImpl(io::CodedInputStream* input, ParseFlags parse_flags);
-
-  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(MessageLite);
 };
 
 namespace internal {
 
 template <bool alias>
-bool MergeFromImpl(StringPiece input, MessageLite* msg,
+bool MergeFromImpl(absl::string_view input, MessageLite* msg,
                    MessageLite::ParseFlags parse_flags);
-extern template bool MergeFromImpl<false>(StringPiece input,
+extern template bool MergeFromImpl<false>(absl::string_view input,
                                           MessageLite* msg,
                                           MessageLite::ParseFlags parse_flags);
-extern template bool MergeFromImpl<true>(StringPiece input,
+extern template bool MergeFromImpl<true>(absl::string_view input,
                                          MessageLite* msg,
                                          MessageLite::ParseFlags parse_flags);
 
@@ -635,6 +620,6 @@ T* OnShutdownDelete(T* p) {
 }  // namespace protobuf
 }  // namespace google
 
-#include <google/protobuf/port_undef.inc>
+#include "google/protobuf/port_undef.inc"
 
 #endif  // GOOGLE_PROTOBUF_MESSAGE_LITE_H__

@@ -32,10 +32,7 @@
 
 using Google.Protobuf.Collections;
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Security;
 
 namespace Google.Protobuf
@@ -431,7 +428,7 @@ namespace Google.Protobuf
         {
             // TODO(jtattermusch): if the message doesn't implement IBufferMessage (and thus does not provide the InternalMergeFrom method),
             // what we're doing here works fine, but could be more efficient.
-            // What happends is that we first initialize a ParseContext from the current coded input stream only to parse the length of the message, at which point
+            // What happens is that we first initialize a ParseContext from the current coded input stream only to parse the length of the message, at which point
             // we will need to switch back again to CodedInputStream-based parsing (which involves copying and storing the state) to be able to
             // invoke the legacy MergeFrom(CodedInputStream) method.
             // For now, this inefficiency is fine, considering this is only a backward-compatibility scenario (and regenerating the code fixes it).
@@ -647,21 +644,6 @@ namespace Google.Protobuf
                 var span = new ReadOnlySpan<byte>(buffer);
                 return SegmentedBufferHelper.IsAtEnd(ref span, ref state);
             }
-        }
-
-        /// <summary>
-        /// Called when buffer is empty to read more bytes from the
-        /// input.  If <paramref name="mustSucceed"/> is true, RefillBuffer() guarantees that
-        /// either there will be at least one byte in the buffer when it returns
-        /// or it will throw an exception.  If <paramref name="mustSucceed"/> is false,
-        /// RefillBuffer() returns false if no more bytes were available.
-        /// </summary>
-        /// <param name="mustSucceed"></param>
-        /// <returns></returns>
-        private bool RefillBuffer(bool mustSucceed)
-        {
-            var span = new ReadOnlySpan<byte>(buffer);
-            return state.segmentedBufferHelper.RefillBuffer(ref span, ref state, mustSucceed);
         }
 
         /// <summary>

@@ -31,6 +31,7 @@
 #endregion
 
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using Google.Protobuf.Compatibility;
 
@@ -50,7 +51,9 @@ namespace Google.Protobuf.Reflection
         private readonly Action<IMessage> clearDelegate;
         private readonly Func<IMessage, bool> hasDelegate;
 
-        internal SingleFieldAccessor(PropertyInfo property, FieldDescriptor descriptor) : base(property, descriptor)
+        internal SingleFieldAccessor(
+            [DynamicallyAccessedMembers(GeneratedClrTypeInfo.MessageAccessibility)]
+            Type messageType, PropertyInfo property, FieldDescriptor descriptor) : base(property, descriptor)
         {
             if (!property.CanWrite)
             {
@@ -87,13 +90,13 @@ namespace Google.Protobuf.Reflection
             // Primitive fields always support presence in proto2, and support presence in proto3 for optional fields.
             else if (descriptor.File.Syntax == Syntax.Proto2 || descriptor.Proto.Proto3Optional)
             {
-                MethodInfo hasMethod = property.DeclaringType.GetRuntimeProperty("Has" + property.Name).GetMethod;
+                MethodInfo hasMethod = messageType.GetRuntimeProperty("Has" + property.Name).GetMethod;
                 if (hasMethod == null)
                 {
                     throw new ArgumentException("Not all required properties/methods are available");
                 }
                 hasDelegate = ReflectionUtil.CreateFuncIMessageBool(hasMethod);
-                MethodInfo clearMethod = property.DeclaringType.GetRuntimeMethod("Clear" + property.Name, ReflectionUtil.EmptyTypes);
+                MethodInfo clearMethod = messageType.GetRuntimeMethod("Clear" + property.Name, ReflectionUtil.EmptyTypes);
                 if (clearMethod == null)
                 {
                     throw new ArgumentException("Not all required properties/methods are available");
@@ -104,18 +107,29 @@ namespace Google.Protobuf.Reflection
             // Primitive proto3 fields without the optional keyword, which aren't in oneofs.
             else
             {
-                hasDelegate = message => { throw new InvalidOperationException("Presence is not implemented for this field"); };
+                hasDelegate = message => throw new InvalidOperationException("Presence is not implemented for this field");
 
                 // While presence isn't supported, clearing still is; it's just setting to a default value.
-                var clrType = property.PropertyType;
-
-                object defaultValue =
-                    clrType == typeof(string) ? ""
-                    : clrType == typeof(ByteString) ? ByteString.Empty
-                    : Activator.CreateInstance(clrType);
+                object defaultValue = GetDefaultValue(descriptor);
                 clearDelegate = message => SetValue(message, defaultValue);
             }
         }
+
+        private static object GetDefaultValue(FieldDescriptor descriptor) =>
+            descriptor.FieldType switch
+            {
+                FieldType.Bool => false,
+                FieldType.Bytes => ByteString.Empty,
+                FieldType.String => "",
+                FieldType.Double => 0.0,
+                FieldType.SInt32 or FieldType.Int32 or FieldType.SFixed32 or FieldType.Enum => 0,
+                FieldType.Fixed32 or FieldType.UInt32 => (uint)0,
+                FieldType.Fixed64 or FieldType.UInt64 => 0UL,
+                FieldType.SFixed64 or FieldType.Int64 or FieldType.SInt64 => 0L,
+                FieldType.Float => 0f,
+                FieldType.Message or FieldType.Group => null,
+                _ => throw new ArgumentException("Invalid field type"),
+            };
 
         public override void Clear(IMessage message) => clearDelegate(message);
         public override bool HasValue(IMessage message) => hasDelegate(message);

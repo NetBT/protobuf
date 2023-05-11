@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/env python3
 #
 # Protocol Buffers - Google's data interchange format
 # Copyright 2015 Google Inc.  All rights reserved.
@@ -134,7 +134,10 @@ def _MacroArgRefRe(macro_arg_names):
 
 class PDDMError(Exception):
   """Error thrown by pddm."""
-  pass
+
+  def __init__(self, message="Error"):
+    self.message = message
+    super().__init__(self.message)
 
 
 class MacroCollection(object):
@@ -318,7 +321,7 @@ class MacroCollection(object):
       # Nothing to do
       return macro.body
     assert len(arg_values) == len(macro.args)
-    args = dict(zip(macro.args, arg_values))
+    args = dict(list(zip(macro.args, arg_values)))
 
     def _lookupArg(match):
       val = args[match.group('name')]
@@ -351,7 +354,7 @@ class MacroCollection(object):
     return macro_arg_ref_re.sub(_lookupArg, macro.body)
 
   def _EvalMacrosRefs(self, text, macro_stack):
-    macro_ref_re = _MacroRefRe(self._macros.keys())
+    macro_ref_re = _MacroRefRe(list(self._macros.keys()))
 
     def _resolveMacro(match):
       return self._Expand(match, macro_stack)
@@ -482,14 +485,13 @@ class SourceFile(object):
         if self._macro_collection:
           # Always add a blank line, seems to read better. (If need be, add an
           # option to the EXPAND to indicate if this should be done.)
-          result.extend([_GENERATED_CODE_LINE, '// clang-format off', ''])
+          result.extend([_GENERATED_CODE_LINE, ''])
           macro = line[directive_len:].strip()
           try:
             expand_result = self._macro_collection.Expand(macro)
             # Since expansions are line oriented, strip trailing whitespace
             # from the lines.
             lines = [x.rstrip() for x in expand_result.split('\n')]
-            lines.append('// clang-format on')
             result.append('\n'.join(lines))
           except PDDMError as e:
             raise PDDMError('%s\n...while expanding "%s" from the section'

@@ -32,7 +32,6 @@
 
 using Google.Protobuf.Collections;
 using System;
-using System.Linq;
 
 namespace Google.Protobuf
 {
@@ -44,12 +43,13 @@ namespace Google.Protobuf
         void WriteTo(ref WriteContext ctx);
         int CalculateSize();
         bool IsInitialized();
+        object GetValue();
     }
 
     internal sealed class ExtensionValue<T> : IExtensionValue
     {
         private T field;
-        private FieldCodec<T> codec;
+        private readonly FieldCodec<T> codec;
 
         internal ExtensionValue(FieldCodec<T> codec)
         {
@@ -117,6 +117,8 @@ namespace Google.Protobuf
         }
 
         public T GetValue() => field;
+
+        object IExtensionValue.GetValue() => field;
 
         public void SetValue(T value)
         {
@@ -200,6 +202,8 @@ namespace Google.Protobuf
         }
 
         public RepeatedField<T> GetValue() => field;
+
+        object IExtensionValue.GetValue() => field;
 
         public bool IsInitialized()
         {

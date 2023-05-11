@@ -1,3 +1,4 @@
+// -*- c++ -*-
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
 // https://developers.google.com/protocol-buffers/
@@ -32,8 +33,7 @@
 #include <string>
 #include <vector>
 
-#include <google/protobuf/arena.h>
-#include <google/protobuf/testing/googletest.h>
+#include "google/protobuf/arena.h"
 #include <gtest/gtest.h>
 
 using UNITTEST::TestAllTypes;
@@ -53,6 +53,7 @@ void SetAllFields(TestAllTypes* m) {
   m->set_optional_foreign_enum(
       UNITTEST::FOREIGN_BAZ);
   m->mutable_optional_lazy_message()->set_bb(45);
+  m->mutable_optional_unverified_lazy_message()->set_bb(46);
   m->add_repeated_int32(100);
   m->add_repeated_string("asdf");
   m->add_repeated_bytes("jkl;");
@@ -81,6 +82,8 @@ void ExpectAllFieldsSet(const TestAllTypes& m) {
             m.optional_foreign_enum());
   EXPECT_EQ(true, m.has_optional_lazy_message());
   EXPECT_EQ(45, m.optional_lazy_message().bb());
+  EXPECT_EQ(true, m.has_optional_unverified_lazy_message());
+  EXPECT_EQ(46, m.optional_unverified_lazy_message().bb());
 
   EXPECT_EQ(1, m.repeated_int32_size());
   EXPECT_EQ(100, m.repeated_int32(0));

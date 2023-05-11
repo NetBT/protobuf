@@ -49,11 +49,12 @@ except NameError:
   long = int  # Python 3
 
 
-# Tests whether the given TestAllTypes message is proto2 or not.
+# Tests whether the given TestAllTypes message is
+# protobuf_unittest.TestAllTypes or not.
 # This is used to gate several fields/features that only exist
-# for the proto2 version of the message.
+# for the protobuf_unittest version of the message.
 def IsProto2(message):
-  return message.DESCRIPTOR.syntax == "proto2"
+  return message.DESCRIPTOR.full_name == 'protobuf_unittest.TestAllTypes'
 
 
 def SetAllNonLazyFields(message):
@@ -218,6 +219,7 @@ def SetAllNonLazyFields(message):
 def SetAllFields(message):
   SetAllNonLazyFields(message)
   message.optional_lazy_message.bb = 127
+  message.optional_unverified_lazy_message.bb = 128
 
 
 def SetAllExtensions(message):
@@ -257,6 +259,7 @@ def SetAllExtensions(message):
   extensions[pb2.optional_import_message_extension].d = 120
   extensions[pb2.optional_public_import_message_extension].e = 126
   extensions[pb2.optional_lazy_message_extension].bb = 127
+  extensions[pb2.optional_unverified_lazy_message_extension].bb = 128
 
   extensions[pb2.optional_nested_enum_extension] = pb2.TestAllTypes.BAZ
   extensions[pb2.optional_nested_enum_extension] = pb2.TestAllTypes.BAZ
@@ -465,6 +468,7 @@ def ExpectAllFieldsSet(test_case, message):
   test_case.assertEqual(120, message.optional_import_message.d)
   test_case.assertEqual(126, message.optional_public_import_message.e)
   test_case.assertEqual(127, message.optional_lazy_message.bb)
+  test_case.assertEqual(128, message.optional_unverified_lazy_message.bb)
 
   test_case.assertEqual(unittest_pb2.TestAllTypes.BAZ,
                         message.optional_nested_enum)
@@ -629,6 +633,13 @@ def GoldenFile(filename):
   # Search internally.
   path = '.'
   full_path = os.path.join(path, 'third_party/py/google/protobuf/testdata',
+                           filename)
+  if os.path.exists(full_path):
+    # Found it.  Load the golden file from the testdata directory.
+    return open(full_path, 'rb')
+
+  # Search for cross-repo path.
+  full_path = os.path.join('external/com_google_protobuf/src/google/protobuf/testdata',
                            filename)
   if os.path.exists(full_path):
     # Found it.  Load the golden file from the testdata directory.

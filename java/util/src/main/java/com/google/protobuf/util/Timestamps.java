@@ -37,9 +37,12 @@ import static com.google.common.math.LongMath.checkedMultiply;
 import static com.google.common.math.LongMath.checkedSubtract;
 
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
+import com.google.errorprone.annotations.CompileTimeConstant;
+import com.google.j2objc.annotations.J2ObjCIncompatible;
 import com.google.protobuf.Duration;
 import com.google.protobuf.Timestamp;
 import java.io.Serializable;
+import java.lang.reflect.Method;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Comparator;
@@ -47,6 +50,7 @@ import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.Locale;
 import java.util.TimeZone;
+import javax.annotation.Nullable;
 
 /**
  * Utilities to help create/manipulate {@code protobuf/timestamp.proto}. All operations throw an
@@ -60,11 +64,11 @@ public final class Timestamps {
   // Timestamp for "9999-12-31T23:59:59Z"
   static final long TIMESTAMP_SECONDS_MAX = 253402300799L;
 
-  static final long NANOS_PER_SECOND = 1000000000;
-  static final long NANOS_PER_MILLISECOND = 1000000;
-  static final long NANOS_PER_MICROSECOND = 1000;
-  static final long MILLIS_PER_SECOND = 1000;
-  static final long MICROS_PER_SECOND = 1000000;
+  static final int NANOS_PER_SECOND = 1000000000;
+  static final int NANOS_PER_MILLISECOND = 1000000;
+  static final int NANOS_PER_MICROSECOND = 1000;
+  static final int MILLIS_PER_SECOND = 1000;
+  static final int MICROS_PER_SECOND = 1000000;
 
   /** A constant holding the minimum valid {@link Timestamp}, {@code 0001-01-01T00:00:00Z}. */
   public static final Timestamp MIN_VALUE =
@@ -115,8 +119,8 @@ public final class Timestamps {
 
   /**
    * Returns a {@link Comparator} for {@link Timestamp Timestamps} which sorts in increasing
-   * chronological order. Nulls and invalid {@link Timestamp Timestamps} are not allowed (see
-   * {@link #isValid}). The returned comparator is serializable.
+   * chronological order. Nulls and invalid {@link Timestamp Timestamps} are not allowed (see {@link
+   * #isValid}). The returned comparator is serializable.
    */
   public static Comparator<Timestamp> comparator() {
     return TimestampComparator.INSTANCE;
@@ -228,8 +232,8 @@ public final class Timestamps {
    *
    * <p>Example of accepted format: "1972-01-01T10:00:20.021-05:00"
    *
-   * @return A Timestamp parsed from the string.
-   * @throws ParseException if parsing fails.
+   * @return a Timestamp parsed from the string
+   * @throws ParseException if parsing fails
    */
   public static Timestamp parse(String value) throws ParseException {
     int dayOffset = value.indexOf('T');
@@ -279,8 +283,64 @@ public final class Timestamps {
     try {
       return normalizedTimestamp(seconds, nanos);
     } catch (IllegalArgumentException e) {
-      throw new ParseException("Failed to parse timestamp: timestamp is out of range.", 0);
+      ParseException ex =
+          new ParseException(
+              "Failed to parse timestamp " + value + " Timestamp is out of range.", 0);
+      ex.initCause(e);
+      throw ex;
     }
+  }
+
+  /**
+   * Parses a string in RFC 3339 format into a {@link Timestamp}.
+   *
+   * <p>Identical to {@link #parse(String)}, but throws an {@link IllegalArgumentException} instead
+   * of a {@link ParseException} if parsing fails.
+   *
+   * @return a {@link Timestamp} parsed from the string
+   * @throws IllegalArgumentException if parsing fails
+   */
+  public static Timestamp parseUnchecked(@CompileTimeConstant String value) {
+    try {
+      return parse(value);
+    } catch (ParseException e) {
+      // While `java.time.format.DateTimeParseException` is a more accurate representation of the
+      // failure, this library is currently not JDK8 ready because of Android dependencies.
+      throw new IllegalArgumentException(e);
+    }
+  }
+
+  // the following 3 constants contain references to java.time.Instant methods (if that class is
+  // available at runtime); otherwise, they are null.
+  @Nullable private static final Method INSTANT_NOW = instantMethod("now");
+
+  @Nullable private static final Method INSTANT_GET_EPOCH_SECOND = instantMethod("getEpochSecond");
+
+  @Nullable private static final Method INSTANT_GET_NANO = instantMethod("getNano");
+
+  @Nullable
+  private static Method instantMethod(String methodName) {
+    try {
+      return Class.forName("java.time.Instant").getMethod(methodName);
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  /** Create a Timestamp using the best-available system clock. */
+  public static Timestamp now() {
+    if (INSTANT_NOW != null) {
+      try {
+        Object now = INSTANT_NOW.invoke(null);
+        long epochSecond = (long) INSTANT_GET_EPOCH_SECOND.invoke(now);
+        int nanoAdjustment = (int) INSTANT_GET_NANO.invoke(now);
+        return normalizedTimestamp(epochSecond, nanoAdjustment);
+      } catch (Throwable fallThrough) {
+        throw new AssertionError(fallThrough);
+      }
+    }
+    // otherwise, fall back on millisecond precision
+    return fromMillis(System.currentTimeMillis());
   }
 
   /** Create a Timestamp from the number of seconds elapsed from the epoch. */
@@ -309,9 +369,34 @@ public final class Timestamps {
   }
 
   /**
+   * Create a Timestamp from a {@link Date}. If the {@link Date} is a {@link java.sql.Timestamp},
+   * full nanonsecond precision is retained.
+   *
+   * @throws IllegalArgumentException if the year is before 1 CE or after 9999 CE
+   */
+  @SuppressWarnings("GoodTime") // this is a legacy conversion API
+  @J2ObjCIncompatible
+  public static Timestamp fromDate(Date date) {
+    if (date instanceof java.sql.Timestamp) {
+      java.sql.Timestamp sqlTimestamp = (java.sql.Timestamp) date;
+      long time = sqlTimestamp.getTime();
+      long integralSeconds =
+          (time < 0 && time % 1000 != 0)
+              ? time / 1000L - 1
+              : time / 1000L; // truncate the fractional seconds
+      return Timestamp.newBuilder()
+          .setSeconds(integralSeconds)
+          .setNanos(sqlTimestamp.getNanos())
+          .build();
+    } else {
+      return fromMillis(date.getTime());
+    }
+  }
+
+  /**
    * Convert a Timestamp to the number of milliseconds elapsed from the epoch.
    *
-   * <p>The result will be rounded down to the nearest millisecond. E.g., if the timestamp
+   * <p>The result will be rounded down to the nearest millisecond. For instance, if the timestamp
    * represents "1969-12-31T23:59:59.999999999Z", it will be rounded to -1 millisecond.
    */
   @SuppressWarnings("GoodTime") // this is a legacy conversion API

@@ -33,12 +33,9 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
-#if NET35
-// Needed for ReadOnlyDictionary, which does not exist in .NET 3.5
-using Google.Protobuf.Collections;
-#endif
 
 namespace Google.Protobuf.Reflection
 {
@@ -120,9 +117,15 @@ namespace Google.Protobuf.Reflection
         private static ReadOnlyDictionary<string, FieldDescriptor> CreateJsonFieldMap(IList<FieldDescriptor> fields)
         {
             var map = new Dictionary<string, FieldDescriptor>();
+            // The ordering is important here: JsonName takes priority over Name,
+            // which means we need to put JsonName values in the map after *all*
+            // Name keys have been added. See https://github.com/protocolbuffers/protobuf/issues/11987
             foreach (var field in fields)
             {
                 map[field.Name] = field;
+            }
+            foreach (var field in fields)
+            {
                 map[field.JsonName] = field;
             }
             return new ReadOnlyDictionary<string, FieldDescriptor>(map);
@@ -133,22 +136,24 @@ namespace Google.Protobuf.Reflection
         /// </summary>
         public override string Name => Proto.Name;
 
-        internal override IReadOnlyList<DescriptorBase> GetNestedDescriptorListForField(int fieldNumber)
-        {
-            switch (fieldNumber)
+        internal override IReadOnlyList<DescriptorBase> GetNestedDescriptorListForField(int fieldNumber) =>
+            fieldNumber switch
             {
-                case DescriptorProto.FieldFieldNumber:
-                    return (IReadOnlyList<DescriptorBase>) fieldsInDeclarationOrder;
-                case DescriptorProto.NestedTypeFieldNumber:
-                    return (IReadOnlyList<DescriptorBase>) NestedTypes;
-                case DescriptorProto.EnumTypeFieldNumber:
-                    return (IReadOnlyList<DescriptorBase>) EnumTypes;
-                default:
-                    return null;
-            }
-        }
+                DescriptorProto.FieldFieldNumber => (IReadOnlyList<DescriptorBase>)fieldsInDeclarationOrder,
+                DescriptorProto.NestedTypeFieldNumber => (IReadOnlyList<DescriptorBase>)NestedTypes,
+                DescriptorProto.EnumTypeFieldNumber => (IReadOnlyList<DescriptorBase>)EnumTypes,
+                _ => null,
+            };
 
         internal DescriptorProto Proto { get; }
+
+        /// <summary>
+        /// Returns a clone of the underlying <see cref="DescriptorProto"/> describing this message.
+        /// Note that a copy is taken every time this method is called, so clients using it frequently
+        /// (and not modifying it) may want to cache the returned value.
+        /// </summary>
+        /// <returns>A protobuf representation of this message descriptor.</returns>
+        public DescriptorProto ToProto() => Proto.Clone();
 
         internal bool IsExtensionsInitialized(IMessage message)
         {
@@ -182,6 +187,7 @@ namespace Google.Protobuf.Reflection
         /// a wrapper type, and handle the result appropriately.
         /// </para>
         /// </remarks>
+        [DynamicallyAccessedMembers(GeneratedClrTypeInfo.MessageAccessibility)]
         public Type ClrType { get; }
 
         /// <summary>
@@ -266,7 +272,7 @@ namespace Google.Protobuf.Reflection
         /// </summary>
         /// <param name="name">The unqualified name of the field (e.g. "foo").</param>
         /// <returns>The field's descriptor, or null if not found.</returns>
-        public FieldDescriptor FindFieldByName(String name) => File.DescriptorPool.FindSymbol<FieldDescriptor>(FullName + "." + name);
+        public FieldDescriptor FindFieldByName(string name) => File.DescriptorPool.FindSymbol<FieldDescriptor>(FullName + "." + name);
 
         /// <summary>
         /// Finds a field by field number.

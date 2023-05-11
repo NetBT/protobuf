@@ -40,20 +40,21 @@
 
 #include <algorithm>
 #include <memory>
-#include <unordered_map>
 #include <vector>
 
-#include <google/protobuf/stubs/common.h>
-#include <google/protobuf/message.h>
-#include <google/protobuf/stubs/mutex.h>
-#include <google/protobuf/reflection.h>
-#include <google/protobuf/repeated_field.h>
+#include "absl/container/flat_hash_map.h"
+#include "absl/synchronization/mutex.h"
+#include "google/protobuf/message.h"
+#include "google/protobuf/port.h"
+#include "google/protobuf/reflection.h"
+#include "google/protobuf/repeated_field.h"
 
 #ifdef SWIG
 #error "You cannot SWIG proto headers"
 #endif
 
-#include <google/protobuf/port_def.inc>
+// Must be included last.
+#include "google/protobuf/port_def.inc"
 
 namespace google {
 namespace protobuf {
@@ -79,6 +80,9 @@ class DescriptorPool;  // descriptor.h
 // encapsulates this "cache".  All DynamicMessages of the same type created
 // from the same factory will share the same support data.  Any Descriptors
 // used with a particular factory must outlive the factory.
+//
+// The thread safety for this class is subtle, see comments around GetPrototype
+// for details
 class PROTOBUF_EXPORT DynamicMessageFactory : public MessageFactory {
  public:
   // Construct a DynamicMessageFactory that will search for extensions in
@@ -93,8 +97,10 @@ class PROTOBUF_EXPORT DynamicMessageFactory : public MessageFactory {
   //   this is almost never what you want to do.  Almost all users should use
   //   the zero-arg constructor.
   DynamicMessageFactory(const DescriptorPool* pool);
+  DynamicMessageFactory(const DynamicMessageFactory&) = delete;
+  DynamicMessageFactory& operator=(const DynamicMessageFactory&) = delete;
 
-  ~DynamicMessageFactory();
+  ~DynamicMessageFactory() override;
 
   // Call this to tell the DynamicMessageFactory that if it is given a
   // Descriptor d for which:
@@ -130,13 +136,11 @@ class PROTOBUF_EXPORT DynamicMessageFactory : public MessageFactory {
   bool delegate_to_generated_factory_;
 
   struct TypeInfo;
-  std::unordered_map<const Descriptor*, const TypeInfo*> prototypes_;
-  mutable internal::WrappedMutex prototypes_mutex_;
+  absl::flat_hash_map<const Descriptor*, const TypeInfo*> prototypes_;
+  mutable absl::Mutex prototypes_mutex_;
 
   friend class DynamicMessage;
   const Message* GetPrototypeNoLock(const Descriptor* type);
-
-  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(DynamicMessageFactory);
 };
 
 // Helper for computing a sorted list of map entries via reflection.
@@ -158,9 +162,9 @@ class PROTOBUF_EXPORT DynamicMapSorter {
 #ifndef NDEBUG
     for (size_t j = 1; j < static_cast<size_t>(map_size); j++) {
       if (!comparator(result[j - 1], result[j])) {
-        GOOGLE_LOG(ERROR) << (comparator(result[j], result[j - 1])
-                           ? "internal error in map key sorting"
-                           : "map keys are not unique");
+        ABSL_LOG(ERROR) << (comparator(result[j], result[j - 1])
+                                ? "internal error in map key sorting"
+                                : "map keys are not unique");
       }
     }
 #endif
@@ -182,23 +186,23 @@ class PROTOBUF_EXPORT DynamicMapSorter {
           return first < second;
         }
         case FieldDescriptor::CPPTYPE_INT32: {
-          int32 first = reflection->GetInt32(*a, field_);
-          int32 second = reflection->GetInt32(*b, field_);
+          int32_t first = reflection->GetInt32(*a, field_);
+          int32_t second = reflection->GetInt32(*b, field_);
           return first < second;
         }
         case FieldDescriptor::CPPTYPE_INT64: {
-          int64 first = reflection->GetInt64(*a, field_);
-          int64 second = reflection->GetInt64(*b, field_);
+          int64_t first = reflection->GetInt64(*a, field_);
+          int64_t second = reflection->GetInt64(*b, field_);
           return first < second;
         }
         case FieldDescriptor::CPPTYPE_UINT32: {
-          uint32 first = reflection->GetUInt32(*a, field_);
-          uint32 second = reflection->GetUInt32(*b, field_);
+          uint32_t first = reflection->GetUInt32(*a, field_);
+          uint32_t second = reflection->GetUInt32(*b, field_);
           return first < second;
         }
         case FieldDescriptor::CPPTYPE_UINT64: {
-          uint64 first = reflection->GetUInt64(*a, field_);
-          uint64 second = reflection->GetUInt64(*b, field_);
+          uint64_t first = reflection->GetUInt64(*a, field_);
+          uint64_t second = reflection->GetUInt64(*b, field_);
           return first < second;
         }
         case FieldDescriptor::CPPTYPE_STRING: {
@@ -207,7 +211,7 @@ class PROTOBUF_EXPORT DynamicMapSorter {
           return first < second;
         }
         default:
-          GOOGLE_LOG(DFATAL) << "Invalid key for map field.";
+          ABSL_DLOG(FATAL) << "Invalid key for map field.";
           return true;
       }
     }
@@ -220,6 +224,6 @@ class PROTOBUF_EXPORT DynamicMapSorter {
 }  // namespace protobuf
 }  // namespace google
 
-#include <google/protobuf/port_undef.inc>
+#include "google/protobuf/port_undef.inc"
 
 #endif  // GOOGLE_PROTOBUF_DYNAMIC_MESSAGE_H__

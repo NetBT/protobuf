@@ -83,7 +83,6 @@ public abstract class AbstractMessage
     throw new UnsupportedOperationException("Nested builder is not supported for this type.");
   }
 
-
   @Override
   public List<String> findInitializationErrors() {
     return MessageReflection.findMissingFields(this);
@@ -94,13 +93,13 @@ public abstract class AbstractMessage
     return MessageReflection.delimitWithCommas(findInitializationErrors());
   }
 
-  /** TODO(jieluo): Clear it when all subclasses have implemented this method. */
+  // TODO(jieluo): Clear it when all subclasses have implemented this method.
   @Override
   public boolean hasOneof(OneofDescriptor oneof) {
     throw new UnsupportedOperationException("hasOneof() is not implemented.");
   }
 
-  /** TODO(jieluo): Clear it when all subclasses have implemented this method. */
+  // TODO(jieluo): Clear it when all subclasses have implemented this method.
   @Override
   public FieldDescriptor getOneofFieldDescriptor(OneofDescriptor oneof) {
     throw new UnsupportedOperationException("getOneofFieldDescriptor() is not implemented.");
@@ -224,7 +223,7 @@ public abstract class AbstractMessage
   }
 
   /**
-   * Compares two set of fields. This method is used to implement {@link
+   * Compares two sets of fields. This method is used to implement {@link
    * AbstractMessage#equals(Object)} and {@link AbstractMutableMessage#equals(Object)}. It takes
    * special care of bytes fields because immutable messages and mutable messages use different Java
    * type to represent a bytes field and this method should be able to compare immutable messages,
@@ -242,8 +241,8 @@ public abstract class AbstractMessage
       Object value2 = b.get(descriptor);
       if (descriptor.getType() == FieldDescriptor.Type.BYTES) {
         if (descriptor.isRepeated()) {
-          List list1 = (List) value1;
-          List list2 = (List) value2;
+          List<?> list1 = (List) value1;
+          List<?> list2 = (List) value2;
           if (list1.size() != list2.size()) {
             return false;
           }
@@ -383,8 +382,6 @@ public abstract class AbstractMessage
       //   them to insure that they don't change after verification (since
       //   the Message interface itself cannot enforce immutability of
       //   implementations).
-      // TODO(kenton):  Provide a function somewhere called makeDeepCopy()
-      //   which allows people to make secure deep copies of messages.
 
       for (final Map.Entry<FieldDescriptor, Object> entry : allFields.entrySet()) {
         final FieldDescriptor field = entry.getKey();
@@ -426,25 +423,20 @@ public abstract class AbstractMessage
         throws IOException {
       boolean discardUnknown = input.shouldDiscardUnknownFields();
       final UnknownFieldSet.Builder unknownFields =
-          discardUnknown ? null : UnknownFieldSet.newBuilder(getUnknownFields());
-      while (true) {
-        final int tag = input.readTag();
-        if (tag == 0) {
-          break;
-        }
-
-        MessageReflection.BuilderAdapter builderAdapter =
-            new MessageReflection.BuilderAdapter(this);
-        if (!MessageReflection.mergeFieldFrom(
-            input, unknownFields, extensionRegistry, getDescriptorForType(), builderAdapter, tag)) {
-          // end group tag
-          break;
-        }
-      }
+          discardUnknown ? null : getUnknownFieldSetBuilder();
+      MessageReflection.mergeMessageFrom(this, unknownFields, input, extensionRegistry);
       if (unknownFields != null) {
-        setUnknownFields(unknownFields.build());
+        setUnknownFieldSetBuilder(unknownFields);
       }
       return (BuilderType) this;
+    }
+
+    protected UnknownFieldSet.Builder getUnknownFieldSetBuilder() {
+      return UnknownFieldSet.newBuilder(getUnknownFields());
+    }
+
+    protected void setUnknownFieldSetBuilder(final UnknownFieldSet.Builder builder) {
+      setUnknownFields(builder.build());
     }
 
     @Override
@@ -568,17 +560,6 @@ public abstract class AbstractMessage
         final InputStream input, final ExtensionRegistryLite extensionRegistry) throws IOException {
       return (BuilderType) super.mergeFrom(input, extensionRegistry);
     }
-
-    @Override
-    public boolean mergeDelimitedFrom(final InputStream input) throws IOException {
-      return super.mergeDelimitedFrom(input);
-    }
-
-    @Override
-    public boolean mergeDelimitedFrom(
-        final InputStream input, final ExtensionRegistryLite extensionRegistry) throws IOException {
-      return super.mergeDelimitedFrom(input, extensionRegistry);
-    }
   }
 
   /**
@@ -589,7 +570,7 @@ public abstract class AbstractMessage
   protected static int hashLong(long n) {
     return (int) (n ^ (n >>> 32));
   }
-  //
+
   /**
    * @deprecated from v3.0.0-beta-3+, for compatibility with v2.5.0 and v2.6.1
    * generated code.
@@ -598,7 +579,7 @@ public abstract class AbstractMessage
   protected static int hashBoolean(boolean b) {
     return b ? 1231 : 1237;
   }
-  //
+
   /**
    * @deprecated from v3.0.0-beta-3+, for compatibility with v2.5.0 and v2.6.1
    * generated code.
@@ -607,7 +588,7 @@ public abstract class AbstractMessage
   protected static int hashEnum(EnumLite e) {
     return e.getNumber();
   }
-  //
+
   /**
    * @deprecated from v3.0.0-beta-3+, for compatibility with v2.5.0 and v2.6.1
    * generated code.
